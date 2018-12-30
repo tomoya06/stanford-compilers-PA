@@ -42,6 +42,7 @@ extern YYSTYPE cool_yylval;
 /*
  *  Add Your own definitions here
  */
+void initStringBuf();
 void addChar2String(char *yytext);
 bool isKW(char* str1, char* str2);
 bool isUP(char* yytext);
@@ -55,8 +56,11 @@ bool isUP(char* yytext);
 DARROW      =>
 ASSIGN      <-
 DIGIT       [0-9]
-LETTER      [a-zA-Z{DIGIT}_]
-WS_SINLINE  [ \t]
+ODIGIT      [0-7]
+HDIGIT      [0-9A-Fa-f]
+WORD        [a-zA-Z0-9_]
+LETTER      [a-zA-Z]
+WS_SINLINE  [ \t\v\f\r]
 
 %x comment singlecomment
 %x eof
@@ -72,10 +76,15 @@ WS_SINLINE  [ \t]
 {WS_SINLINE}* ;
 
  /* 
-  * New lines and EOF:
+  * New lines, under lineand EOF:
   */
 \n {
     curr_lineno++;
+}
+
+_ {
+    cool_yylval.error_msg = "_";
+    return (ERROR);
 }
 
 <eof><<EOF>> {
@@ -151,53 +160,60 @@ WS_SINLINE  [ \t]
             BEGIN(0);
         }
     }
-    [^\n]* ;
-
+    [^\n\*\\\(]* ;
+    \* ;
+    \\. ;
+    \( ;
 }
 
  /* 
   * String:
   */
 
-\" BEGIN(string);
+\" {
+    initStringBuf();
+    BEGIN(string);
+}
 
 <string,strerr>{
-    
-    \\n {
-        addChar2String("\n");
-    }
-
-    \\0 {
-        addChar2String("0");
-    }
 
     \\{WS_SINLINE}*\n {
         curr_lineno++;
-        addChar2String("\\n");
+        addChar2String("\n");
     }
 
     \n {
-        cool_yylval.error_msg = "Unterminated string constant";
-        BEGIN(strerr);
+        curr_lineno++;
+        BEGIN(0);
+        if (YY_START != strerr) {
+            cool_yylval.error_msg = "Unterminated string constant";
+        }
+        return (ERROR);
     }
 
-    \0 {
-        cool_yylval.error_msg = "String contains null character";
+    \\\0|\0 {
         BEGIN(strerr);
+        cool_yylval.error_msg = "String contains null character";
     }
 
     <<EOF>> {
+        BEGIN(eof);
         cool_yylval.error_msg = "EOF in string constant";
-        BEGIN(strerr);
+        return (ERROR);
     }
 
     [^\0\n\"\\]* {
         addChar2String(yytext);
     }
 
-    \\ {
-        addChar2String(yytext);
-    }
+    \\t { addChar2String("\t"); }
+    \\b { addChar2String("\b"); }
+    \\n { addChar2String("\n"); }
+    \\f { addChar2String("\f"); }
+    \\\\ { addChar2String("\\"); }
+    \\0 { addChar2String("0"); }
+    \\? { addChar2String("\?"); }
+    \\\" { addChar2String("\""); }
 
     \" {
         if (YY_START == strerr) {
@@ -210,12 +226,14 @@ WS_SINLINE  [ \t]
         }
     }
 
+    \\. addChar2String(yytext+1);
+
 }
 
  /* 
   * Keywords, Boolean and ID: (without LET_STMT)
   */
-{LETTER}+ {
+{LETTER}{WORD}* {
     // KEYWORDS:
     if (isKW(yytext, "CLASS")) { return (CLASS); }  
     if (isKW(yytext, "ELSE")) { return (ELSE); }  
@@ -234,15 +252,18 @@ WS_SINLINE  [ \t]
     if (isKW(yytext, "NEW")) { return (NEW); }  
     if (isKW(yytext, "ISVOID")) { return (ISVOID); }  
     if (isKW(yytext, "NOT")) { return (NOT); }  
-    // BOOLEAN:
-    if (isKW(yytext, "TRUE")) { cool_yylval.boolean = 1; return (BOOL_CONST); }  
-    if (isKW(yytext, "FALSE")) { cool_yylval.boolean = 0; return (BOOL_CONST); }  
-    // IDS:
-    if (isUP(yytext)) { cool_yylval.symbol = stringtable.add_string(yytext); return (TYPEID); }  
-    else { cool_yylval.symbol = stringtable.add_string(yytext); return (OBJECTID); }
+    // BOOLEAN or IDS:
+    if (!isUP(yytext)) {
+        if (isKW(yytext, "TRUE")) { cool_yylval.boolean = true; return (BOOL_CONST); } 
+        if (isKW(yytext, "FALSE")) { cool_yylval.boolean = false; return (BOOL_CONST); } 
+        else { cool_yylval.symbol = stringtable.add_string(yytext); return (OBJECTID); }      
+    } else { 
+        cool_yylval.symbol = stringtable.add_string(yytext); return (TYPEID);
+    }
 }
 
 {DARROW} return (DARROW);
+{ASSIGN} return (ASSIGN);
 "<=" return (LE);
 
  /* 
@@ -253,7 +274,17 @@ WS_SINLINE  [ \t]
     return (INT_CONST);
 }
 
+. {
+    initStringBuf();
+    addChar2String(yytext);
+    cool_yylval.error_msg = string_buf;
+    return (ERROR);
+}
+
 %%
+void initStringBuf() {
+    strcpy(string_buf, "");
+}
 
 bool isKW(char* str1, char* str2) {
     if (strlen(str1) != strlen(str2)) {
@@ -272,10 +303,11 @@ bool isUP(char* yytext) {
 }
 
 void addChar2String(char *yytext) {
+    if (YY_START == strerr) { return ; }
     int curlen = strlen(string_buf);
     int newlen = strlen(yytext);
 
-    if (curlen+newlen > MAX_STR_CONST) {
+    if (curlen+newlen >= MAX_STR_CONST) {
         yylval.error_msg = "String constant too long";
         BEGIN(strerr);
     } else {
