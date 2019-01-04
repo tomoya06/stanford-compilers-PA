@@ -6,7 +6,7 @@ Course Homepage: https://lagunita.stanford.edu/courses/Engineering/Compilers/Fal
 
 Get inspired from [asnr's](https://github.com/asnr/stanford-compilers/blob/master/lexer/cool.flex) and [Quexint's](https://github.com/Quexint/Assignment-Driven-Learning/blob/master/OCW/%5BStanford%5DCS143_Compilers/PA/PA2_Lexer/cool.flex) work in this PA. 
 
-* Flex Online Manual: ftp://ftp.gnu.org/old-gnu/Manuals/flex-2.5.4/html_mono/flex.html , which offers more details.
+* Flex Online Manual: [here](http://dinosaur.compilertools.net/flex/index.html) , which offers more details.
 * Pay attention to...
   * special characters
   * upper/lower cases
