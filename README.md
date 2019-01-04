@@ -11,7 +11,7 @@ Get inspired from [asnr's](https://github.com/asnr/stanford-compilers/blob/maste
   * special characters
   * upper/lower cases
 
-## PA3+: Parser
+## PA3: Parser
 
 Get inspired from [dfridman1's work](https://github.com/dfridman1/CS143-Compilers-Stanford/blob/master/PA3/cool.y) in this PA.
 
@@ -21,3 +21,4 @@ Get inspired from [dfridman1's work](https://github.com/dfridman1/CS143-Compiler
   * error
   * empty list
 
+## PA4+: on the way...
